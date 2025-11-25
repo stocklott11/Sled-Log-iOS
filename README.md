@@ -7,7 +7,7 @@ The app I built is called Sled Log. It lets me track all of my snowmobiles and t
 My purpose for creating this app was to learn how to build a complete mobile app from scratch. I wanted something that tied together multiple screens, user input, stored data, and a clean interface on iOS. I also wanted it to be useful to me, which made the development process more motivating and meaningful.
 
 
-[Software Demo Video](http://youtube.link.goes.here)
+[Software Demo Video](https://youtu.be/GIOBmB-iJLc)
 
 # Development Environment
 
