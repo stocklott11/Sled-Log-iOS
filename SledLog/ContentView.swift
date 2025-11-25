@@ -1,86 +1,130 @@
-//
-//  ContentView.swift
-//  SledLog
-//
-//  Created by Stockton Lott on 11/19/25.
-//
-
 import SwiftUI
-import CoreData
 
 struct ContentView: View {
-    @Environment(\.managedObjectContext) private var viewContext
+    @State private var sleds: [Sled]
+    @State private var showingAddSled = false
 
-    @FetchRequest(
-        sortDescriptors: [NSSortDescriptor(keyPath: \Item.timestamp, ascending: true)],
-        animation: .default)
-    private var items: FetchedResults<Item>
+    private let storageKey = "sleds"
+    private let headerHeight: CGFloat = 220   // taller header so text sits fully in blue
+
+    init() {
+        if let data = UserDefaults.standard.data(forKey: storageKey),
+           let decoded = try? JSONDecoder().decode([Sled].self, from: data) {
+            _sleds = State(initialValue: decoded)
+        } else {
+            _sleds = State(initialValue: Sled.sampleData)
+        }
+    }
+
+    private func deleteSleds(at offsets: IndexSet) {
+        sleds.remove(atOffsets: offsets)
+    }
 
     var body: some View {
         NavigationView {
-            List {
-                ForEach(items) { item in
-                    NavigationLink {
-                        Text("Item at \(item.timestamp!, formatter: itemFormatter)")
-                    } label: {
-                        Text(item.timestamp!, formatter: itemFormatter)
+            ZStack(alignment: .top) {
+                
+                // Background behind everything
+                Color(.systemGroupedBackground)
+                    .ignoresSafeArea()
+                
+                // List pushed down below the header
+                List {
+                    Text("Sled Inventory")
+                        .font(.title3)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.primary)
+                        .padding(.horizontal)
+                        .padding(.top, 12)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    ForEach($sleds) { $sled in
+                        NavigationLink(destination: SledDetailView(sled: $sled)) {
+                            
+                            VStack(alignment: .leading, spacing: 4) {
+                                
+                                Text(sled.name)
+                                    .font(.headline)
+
+                                Text("\(sled.year) \(sled.model)")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+
+                                if !sled.notes.isEmpty {
+                                    Text(sled.notes)
+                                        .font(.footnote)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            .padding(.vertical, 6)
+                        }
                     }
+                    .onDelete(perform: deleteSleds)
                 }
-                .onDelete(perform: deleteItems)
+                .scrollContentBackground(.hidden)
+                .padding(.top, headerHeight - 100)   // space for the header
+
+                // Blue header on top
+                headerView
             }
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    EditButton()
-                }
-                ToolbarItem {
-                    Button(action: addItem) {
-                        Label("Add Item", systemImage: "plus")
-                    }
+                Button {
+                    showingAddSled = true
+                } label: {
+                    Image(systemName: "plus")
                 }
             }
-            Text("Select an item")
+            .navigationBarTitleDisplayMode(.inline)
+            .navigationTitle("")   // we draw our own title in the header
+            .sheet(isPresented: $showingAddSled) {
+                AddSledView { newSled in
+                    sleds.append(newSled)
+                }
+            }
         }
-    }
-
-    private func addItem() {
-        withAnimation {
-            let newItem = Item(context: viewContext)
-            newItem.timestamp = Date()
-
-            do {
-                try viewContext.save()
-            } catch {
-                // Replace this implementation with code to handle the error appropriately.
-                // fatalError() causes the application to generate a crash log and terminate. You should not use this function in a shipping application, although it may be useful during development.
-                let nsError = error as NSError
-                fatalError("Unresolved error \(nsError), \(nsError.userInfo)")
+        .onChange(of: sleds) { _, newValue in
+            if let data = try? JSONEncoder().encode(newValue) {
+                UserDefaults.standard.set(data, forKey: storageKey)
             }
         }
     }
 
-    private func deleteItems(offsets: IndexSet) {
-        withAnimation {
-            offsets.map { items[$0] }.forEach(viewContext.delete)
+    // MARK: - Header View
 
-            do {
-                try viewContext.save()
-            } catch {
-                // Replace this implementation with code to handle the error appropriately.
-                // fatalError() causes the application to generate a crash log and terminate. You should not use this function in a shipping application, although it may be useful during development.
-                let nsError = error as NSError
-                fatalError("Unresolved error \(nsError), \(nsError.userInfo)")
+    private var headerView: some View {
+        ZStack(alignment: .top) {
+            // Blue gradient background
+            LinearGradient(
+                colors: [Color.blue, Color.blue.opacity(0.75)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .frame(maxWidth: .infinity)
+            .frame(height: headerHeight)
+            .ignoresSafeArea(edges: .top)
+
+            // Centered text moved up into the blue
+            VStack(spacing: 6) {
+                Text("Sled Log")
+                    .font(.largeTitle)
+                    .fontWeight(.heavy)
+                    .foregroundColor(.white)
+
+                Text("\(sleds.count) sled\(sleds.count == 1 ? "" : "s") tracked")
+                    .font(.subheadline)
+                    .foregroundColor(.white.opacity(0.9))
+                    .multilineTextAlignment(.center)
+
+                Text("Tap a sled to view or log maintenance.")
+                    .font(.footnote)
+                    .foregroundColor(.white.opacity(0.85))
+                    .multilineTextAlignment(.center)
             }
+            .frame(maxWidth: .infinity)
         }
+        .shadow(color: Color.black.opacity(0.25), radius: 10, x: 0, y: 6)
     }
 }
 
-private let itemFormatter: DateFormatter = {
-    let formatter = DateFormatter()
-    formatter.dateStyle = .short
-    formatter.timeStyle = .medium
-    return formatter
-}()
-
 #Preview {
-    ContentView().environment(\.managedObjectContext, PersistenceController.preview.container.viewContext)
+    ContentView()
 }
